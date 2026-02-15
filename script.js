@@ -6,12 +6,16 @@
 const CONFIG = {
     DEFAULT_COORD: { lat: 40.7128, lng: -74.0060 }, // NYC
     INACTIVITY_LIMIT_SEC: 90,
-    SOS_LIMIT_SEC: 120,
+    SOS_LIMIT_SEC: 5,
     RISK_THRESHOLD: 3,
     MARKER_COLORS: {
         USER: '#3b82f6',
         CHECKPOINT: '#10b981',
         RISK: '#ef4444'
+    },
+    TELEGRAM: {
+        BOT_TOKEN: 'YOUR_BOT_TOKEN', // User needs to replace this
+        CHAT_ID: 'YOUR_CHAT_ID'      // User needs to replace this
     }
 };
 
@@ -69,6 +73,16 @@ function init() {
 
     // Start background loops
     setInterval(monitoringLoop, 1000);
+
+    // Load Telegram Config
+    const savedTg = localStorage.getItem('auraPathTelegram');
+    if (savedTg) {
+        CONFIG.TELEGRAM = JSON.parse(savedTg);
+        const tokenInput = document.getElementById('tgBotToken');
+        tokenInput.value = "SAVED";
+        tokenInput.type = "text";
+        document.getElementById('tgChatId').value = CONFIG.TELEGRAM.CHAT_ID;
+    }
 }
 
 function setupMap() {
@@ -267,8 +281,22 @@ function handleConfirmSafe() {
     console.log("User confirmed safe.");
 }
 
-function handleShareLocation() {
-    alert("Emergency contact notified with your location: " + state.userPos.lat.toFixed(4) + ", " + state.userPos.lng.toFixed(4));
+async function handleShareLocation() {
+    const lat = state.userPos.lat.toFixed(4);
+    const lng = state.userPos.lng.toFixed(4);
+    const message = `🚨 <b>MANUAL SOS ALERT</b> 🚨\n\nAuraPath user has manually shared their location!\n\n📍 <b>Coordinates:</b> ${lat}, ${lng}\n🗺️ <b>View on Map:</b> https://www.google.com/maps?q=${lat},${lng}`;
+
+    showToast("Sending emergency notification...", "info");
+    const success = await sendTelegramSOS(message);
+
+    if (success) {
+        // success handled inside sendTelegramSOS toast now
+    } else {
+        showToast("Failed to send Telegram alert. Check configuration.", "error");
+        // Fallback to alert if Telegram fails
+        alert("Emergency contact notified with your location: " + lat + ", " + lng);
+    }
+
     document.getElementById('riskAlertPopup').classList.add('hidden');
 }
 
@@ -301,10 +329,62 @@ function updateSosDisplay() {
     document.getElementById('sosTimer').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 }
 
-function triggerEmergencyProtocol() {
+async function triggerEmergencyProtocol() {
     state.sosActive = false;
     document.getElementById('sosAlertPopup').classList.remove('hidden');
     console.error("Emergency protocol triggered!");
+
+    const lat = state.userPos.lat.toFixed(4);
+    const lng = state.userPos.lng.toFixed(4);
+    const message = `🚨 <b>AUTOMATIC SOS ALERT</b> 🚨\n\nAuraPath SOS timer has expired without user check-in!\n\n📍 <b>Last Known Location:</b> ${lat}, ${lng}\n🗺️ <b>View on Map:</b> https://www.google.com/maps?q=${lat},${lng}`;
+
+    showToast("Triggering automatic SOS Telegram alert...", "error");
+    await sendTelegramSOS(message);
+}
+
+/**
+ * Sends a notification to Telegram via Bot API
+ */
+async function sendTelegramSOS(message) {
+    const { BOT_TOKEN, CHAT_ID } = CONFIG.TELEGRAM;
+
+    if (!BOT_TOKEN || BOT_TOKEN === 'YOUR_BOT_TOKEN' || !CHAT_ID || CHAT_ID === 'YOUR_CHAT_ID') {
+        console.warn("Telegram Bot Token or Chat ID not configured.");
+        showToast("Telegram not configured! Check settings.", "error");
+        return false;
+    }
+
+    // Use GET request with query params for better compatibility in local file:// environments
+    // This avoids CORS preflight (OPTIONS) which often fails on file://
+    const baseUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const params = new URLSearchParams({
+        chat_id: CHAT_ID,
+        text: message,
+        parse_mode: 'HTML' // Switched to HTML for more predictable parsing
+    });
+
+    const url = `${baseUrl}?${params.toString()}`;
+
+    console.log("Attempting to send Telegram SOS...");
+
+    try {
+        const response = await fetch(url); // Default is GET
+        const data = await response.json();
+
+        if (data.ok) {
+            console.log("Telegram SOS sent successfully");
+            showToast("Telegram alert sent!", "success");
+            return true;
+        } else {
+            console.error("Telegram API error:", data);
+            showToast(`Telegram Error: ${data.description}`, "error");
+            return false;
+        }
+    } catch (error) {
+        console.error("Error sending Telegram SOS:", error);
+        showToast("Network error while sending SOS", "error");
+        return false;
+    }
 }
 
 // 6. Safe Checkpoints
@@ -430,6 +510,49 @@ function setupEventListeners() {
         if (theme === 'light') document.body.classList.add('light-mode');
         else document.body.classList.remove('light-mode');
         showToast(`Switched to ${theme} mode`, 'info');
+    };
+
+    // Telegram Config Focus (Clear "SAVED" on click to allow edit)
+    document.getElementById('tgBotToken').onfocus = (e) => {
+        if (e.target.value === 'SAVED') {
+            e.target.value = '';
+            e.target.type = 'password';
+        }
+    };
+
+    // Telegram Config Toggle
+    document.getElementById('toggleTelegramConfig').onclick = () => {
+        document.getElementById('telegramInputs').classList.toggle('hidden');
+    };
+
+    // Telegram Config Save
+    document.getElementById('saveTelegramConfig').onclick = async () => {
+        const tokenInput = document.getElementById('tgBotToken');
+        const chatIdInput = document.getElementById('tgChatId');
+        const token = tokenInput.value.trim();
+        const chatId = chatIdInput.value.trim();
+
+        if (!token || !chatId || token === 'SAVED') {
+            showToast("Please enter valid credentials", "error");
+            return;
+        }
+
+        CONFIG.TELEGRAM.BOT_TOKEN = token;
+        CONFIG.TELEGRAM.CHAT_ID = chatId;
+        localStorage.setItem('auraPathTelegram', JSON.stringify(CONFIG.TELEGRAM));
+
+        // UI Feedback: Change token to "SAVED"
+        tokenInput.value = "SAVED";
+        tokenInput.type = "text"; // Show it as saved text
+
+        showToast("Configuration saved! Sending test message...", "info");
+
+        // Send actual test message
+        const success = await sendTelegramSOS("✅ <b>AuraPath:</b> Connection Successful! Your emergency alerts will now be sent to this chat.");
+
+        if (success) {
+            setTimeout(() => document.getElementById('telegramInputs').classList.add('hidden'), 2000);
+        }
     };
 
     // Global Ripple Effect

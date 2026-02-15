@@ -137,6 +137,23 @@
                         <button id="imSafeBtn" class="btn-success">I AM SAFE (RESET)</button>
                         <p class="sos-hint">Keep this updated every 2 minutes.</p>
                     </div>
+
+                    <!-- Telegram Config (Clickable to Expand) -->
+                    <div class="telegram-config">
+                        <button id="toggleTelegramConfig" class="btn-text">⚙️ Configure Telegram Alert</button>
+                        <div id="telegramInputs" class="telegram-inputs hidden">
+                            <div class="input-field-small">
+                                <label>Bot Token</label>
+                                <input type="password" id="tgBotToken" placeholder="Enter Bot Token">
+                            </div>
+                            <div class="input-field-small">
+                                <label>Chat ID / Username</label>
+                                <input type="text" id="tgChatId" placeholder="e.g. 123456789">
+                            </div>
+                            <button id="saveTelegramConfig" class="btn-secondary btn-small">Save Config</button>
+                        </div>
+                    </div>
+
                     <p id="sosInactiveHint">Toggle to activate SOS mode</p>
                 </section>
 
