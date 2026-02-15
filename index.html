@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraPath | Safety-First Navigation</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">✨</span>
+                <h1>AuraPath</h1>
+            </div>
+            <div class="header-status">
+                <div class="theme-switch-wrapper">
+                    <label class="theme-switch" for="themeToggle">
+                        <input type="checkbox" id="themeToggle" />
+                        <div class="slider-theme round">
+                            <span class="theme-icon-dark">🌙</span>
+                            <span class="theme-icon-light">☀️</span>
+                        </div>
+                    </label>
+                </div>
+                <div id="movementStatus" class="status-indicator">
+                    <span class="pulse"></span>
+                    <span class="status-text">Monitoring Movement</span>
+                </div>
+                <div id="riskLevelBadge" class="badge risk-low">Low Risk Zone</div>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <!-- Left Sidebar: Controls -->
+            <aside class="sidebar left-sidebar">
+                <section class="panel input-panel fade-in">
+                    <h3>📍 Location Settings</h3>
+                    <div class="input-controls">
+                        <button id="useLocationBtn" class="btn-primary btn-ripple">Use My Location</button>
+                        <div id="manualInputs" class="manual-inputs hidden">
+                            <div class="input-field-full">
+                                <label>Location Name</label>
+                                <input type="text" id="manualLocationName" placeholder="e.g. Times Square, NY">
+                            </div>
+                            <button id="setManualLocation" class="btn-secondary">Set Current Position</button>
+                        </div>
+                    </div>
+                    <div class="input-field destination-field">
+                        <label>Destination</label>
+                        <div class="destination-input-wrapper">
+                            <input type="text" id="destinationInput" placeholder="Where are you going?">
+                            <button id="searchRouteBtn" class="btn-action btn-ripple">GO</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="routeComparisonCard" class="panel route-panel hidden fade-in">
+                    <h3>🛣️ Route Options</h3>
+                    <div id="routeLoader" class="route-loader hidden">
+                        <div class="spinner"></div>
+                        <p class="helper-text">Analyzing safety data...</p>
+                    </div>
+                    <div id="routesList" class="routes-list">
+                        <!-- Routes dynamically injected here -->
+                    </div>
+                </section>
+
+                <section class="panel safety-engine-panel">
+                    <h3>🛡️ Safety Analysis</h3>
+                    <div id="safetyScoreContainer" class="safety-visual">
+                        <div class="meter">
+                            <div id="safetyMeterBar" class="meter-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="score-details">
+                            <span id="safetyScoreValue">0</span><small>/100</small>
+                            <p id="safetyVerdict">Calculating safety metrics...</p>
+                        </div>
+                    </div>
+                    <div class="safety-stats">
+                        <div class="stat"><span id="statLights">0</span> 🏮 Lights</div>
+                        <div class="stat"><span id="statShops">0</span> 🏪 Shops</div>
+                        <div class="stat"><span id="statRisk">0</span> ⚠️ Risk</div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- Center: Map -->
+            <section class="map-area">
+                <div id="map"></div>
+
+                <!-- Overlay: Risk Monitor Alert (Hidden by default) -->
+                <div id="riskAlertPopup" class="alert-overlay hidden">
+                    <div class="alert-content">
+                        <h2>⚠️ Inactivity Detected</h2>
+                        <p>You haven't moved in 90 seconds and are in a moderate/high risk zone.</p>
+                        <div class="alert-actions">
+                            <button id="confirmSafeBtn" class="btn-safe">I AM SAFE</button>
+                            <button id="shareLocationBtn" class="btn-danger">SHARE LOCATION</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SOS Emergency Alert (Hidden by default) -->
+                <div id="sosAlertPopup" class="alert-overlay emergency hidden">
+                    <div class="alert-content">
+                        <h2>🆘 EMERGENCY PROTOCOL</h2>
+                        <p>No response detected. Emergency contacts and authorities have been notified of your last
+                            known location.</p>
+                        <button id="dismissSosAlert" class="btn-secondary">DISMISS</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Sidebar: Safety Features -->
+            <aside class="sidebar right-sidebar">
+                <section class="panel sos-panel">
+                    <div class="sos-header">
+                        <h3>🆘 SOS Safety Mode</h3>
+                        <label class="switch">
+                            <input type="checkbox" id="sosToggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div id="sosControls" class="sos-controls hidden">
+                        <div class="countdown-display">
+                            <span id="sosTimer">02:00</span>
+                        </div>
+                        <button id="imSafeBtn" class="btn-success">I AM SAFE (RESET)</button>
+                        <p class="sos-hint">Keep this updated every 2 minutes.</p>
+                    </div>
+                    <p id="sosInactiveHint">Toggle to activate SOS mode</p>
+                </section>
+
+                <section class="panel checkpoints-panel">
+                    <h3>🏙️ Safe Checkpoints Near You</h3>
+                    <div id="checkpointsList" class="checkpoints-list">
+                        <p class="empty-msg">Start navigation to see checkpoints</p>
+                    </div>
+                </section>
+
+                <section class="panel community-panel">
+                    <h3>👥 Community Review</h3>
+                    <form id="reviewForm" class="review-form">
+                        <div class="chips">
+                            <label class="chip">
+                                <input type="radio" name="review" value="well_lit" required>
+                                <span>💡 Well Lit</span>
+                            </label>
+                            <label class="chip">
+                                <input type="radio" name="review" value="crowded">
+                                <span>👨‍👩‍👧 Crowded</span>
+                            </label>
+                            <label class="chip">
+                                <input type="radio" name="review" value="unsafe">
+                                <span>🌑 Unsafe</span>
+                            </label>
+                            <label class="chip">
+                                <input type="radio" name="review" value="lighting_needed">
+                                <span>🛠️ Needs Light</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn-submit">Submit Report</button>
+                    </form>
+                    <div class="recent-reviews">
+                        <h4>Recent Reports</h4>
+                        <div id="reviewsContainer" class="reviews-container">
+                            <!-- Reviews from localStorage -->
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
